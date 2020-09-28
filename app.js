@@ -22,9 +22,7 @@ app.use(cors());
 app.use(helmet());
 app.use(bodyparser.json());
 
-app.use('/api/auth', auth);
-
-router.get('/customers', [validateToken], async(req, res, next) => {
+router.get('/customers', async(req, res, next) => {
     try {
         const customers = await Customer.find()
         return res.json(customers);
@@ -44,5 +42,8 @@ router.post('/customers', async(req, res, next) => {
         return res.send({ status: 'fail', message: error })
     }
 });
+
+app.use('/', router);
+app.use('/api/auth', auth);
 
 app.listen(3000, () => console.log('Server starting'));
