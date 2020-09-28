@@ -6,14 +6,29 @@ const jwt = require('jsonwebtoken');
 const generateToken = (uid, name) => {
     return new Promise((resolve, reject) => {
         const payload = { uid, name };
-        jwt.sign(playload, process.env.SECRET_TOKEN, { expiresIn: '48h' }, (err, token => {
+        jwt.sign(payload, process.env.SECRET_TOKEN, { expiresIn: '48h' }, (error, token) => {
             if (error) {
                 reject('Error generate token');
             } else {
                 resolve(token);
             }
-        }))
+        })
     })
+}
+
+exports.validateToken = (req, res, next) => {
+    const token = req.header('x-token');
+    if (!token) {
+        return res.status(400).json({ message: 'Token has not exist' });
+    }
+    try {
+        const { uid, name } = jwt.verify(token, process.env.SECRET_TOKEN);
+        req.uid = uid;
+        req.name = name;
+    } catch (error) {
+        return res.status(400).json({ message: 'Token has not exist' });
+    }
+    next()
 }
 
 const encryptPassword = async(password) => {
@@ -24,10 +39,10 @@ const encryptPassword = async(password) => {
         return 'Error password'
     }
 }
-const register = async(req, res) => {
+exports.register = async(req, res) => {
     const user = req.body;
     const email = user.email;
-    const exist = User.findOne({ email });
+    const exist = await User.findOne({ email });
 
     if (exist) {
         return res.status(400).json({ message: 'Account already exist' })
@@ -40,4 +55,23 @@ const register = async(req, res) => {
     return res.status(200).json({ name: user.name, uid: user._id, token: token });
 }
 
-module.exports = { register };
+exports.login = async(req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'User not exist' });
+        }
+        const isValid = bcrypt.compareSync(password, user.password);
+        if (isValid) {
+            const token = await generateToken(user._id, user.name);
+            return res.status(200).json({ name: user.name, uid: user._id, token: token });
+        } else {
+            return res.status(500).json({ message: "Credential error" });
+        }
+    } catch (error) {
+        if (error) {
+            return res.status(500).json({ error: error });
+        }
+    }
+}
